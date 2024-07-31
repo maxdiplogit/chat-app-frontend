@@ -1,0 +1,35 @@
+.home {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.home-heading {
+    padding: 80px;
+    font-size: 2rem;
+}
+
+.home-heading span {
+    color: blueviolet;
+    font-weight: 1000;
+}
+
+.home-buttons {
+    display: flex;
+}
+
+.home-buttons button {
+    margin: 70px;
+    padding: 10px;
+    border-radius: 10px;
+    background-color: rgb(17, 255, 176);
+    border: none;
+}
+
+.home-buttons button:hover {
+    cursor: pointer;
+    background-color: aquamarine;
+}
