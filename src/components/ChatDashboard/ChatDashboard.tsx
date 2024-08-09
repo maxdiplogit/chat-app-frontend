@@ -8,12 +8,13 @@ import { useSocket } from "../../store/SocketContext";
 import { useEffect, useState } from "react";
 import MessagePanel from "./MessagePanel/MessagePanel";
 import Modal from '@mui/material/Modal';
-import ChatIcon from '@mui/icons-material/Chat';
 import LogoutIcon from '@mui/icons-material/Logout';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+import Diversity2Icon from '@mui/icons-material/Diversity2';
+import AddCircleIcon from '@mui/icons-material/AddCircle';
 
 // Styles
 import './ChatDashboard.css';
@@ -83,7 +84,8 @@ const ChatDashboard = () => {
         }
     };
 
-    const handleDeleteFriend = (value: string) => {
+    const handleDeleteFriend = (value: string, event: React.MouseEvent) => {
+        event.stopPropagation();
         console.log(value);
         dispatch(DeleteFriend({
             receiverUserId: value,
@@ -165,8 +167,8 @@ const ChatDashboard = () => {
                                             <div>
                                                 { user.firstName }
                                             </div>
-                                            <div>
-                                                <button key={ uuid4() } onClick={() => handleAddFriend(user._id)} data-value={user.id}>Add</button>
+                                            <div className="add-friend-button" onClick={() => handleAddFriend(user._id)}>
+                                                <AddCircleIcon />
                                             </div>
                                         </li>
                                     );
@@ -178,7 +180,7 @@ const ChatDashboard = () => {
             </Modal>
             <div className="dashboard-header">
                 <div className="chat-icon-div" onClick={ () => navigate("/") }>
-                    <ChatIcon fontSize="large" className="chat-icon" />
+                    <Diversity2Icon fontSize="large" className="chat-icon" />
                 </div>
                 <div>
                     <div className="chat-header-search-icon-div" onClick={() => setModalOpen(true)}>
@@ -202,7 +204,7 @@ const ChatDashboard = () => {
                                         { isUserOnline(friend._id) ? <FiberManualRecordIcon fontSize="small" className="user-online" /> : <FiberManualRecordIcon fontSize="small" className="user-offline" /> }
                                     </div>
                                 </div>
-                                <div className="delete-user-icon" key={ uuid4() } onClick={() => handleDeleteFriend(friend._id)}>
+                                <div className="delete-user-icon" key={ uuid4() } onClick={(event: React.MouseEvent) => handleDeleteFriend(friend._id, event)}>
                                     <DeleteIcon />
                                 </div>
                             </li>

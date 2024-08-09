@@ -8,7 +8,7 @@
     margin: 0;
     padding: 0;
     width: 4%;
-    background-color: black;
+    background-color: white;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -21,7 +21,7 @@
 }
 
 .chat-icon {
-    color: white;
+    color: black;
 }
 
 .chat-icon:hover {
@@ -65,10 +65,15 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    outline: none;
+    border: none;
 }
 
 .search-users-modal {
-    background-color: rgb(213, 213, 213);
+    outline: none;
+    border: none;
+    border-radius: 10px;
+    background-color: rgb(0, 158, 161);
     width: 50%;
     height: 40%;
     display: flex;
@@ -84,10 +89,29 @@
 }
 
 .search-users-input-div input {
+    background-color: rgb(0, 158, 161);
     width: 90%;
     padding: 5px;
-    border: none;
+    border: 1px solid white;
+    border-top: none;
+    border-left: none;
+    border-right: none;
     border-radius: 5px;
+    color: white;
+    outline: none;
+}
+
+.add-friend-button {
+    display: flex;
+    align-items: center;
+    color: black;
+}
+
+.add-friend-button:hover {
+    cursor: pointer;
+    align-items: center;
+    display: flex;
+    color: rgb(0, 158, 161);
 }
 
 .dashboard-header ul {
@@ -106,12 +130,12 @@
 }
 
 .close-icon {
-    color: rgb(148, 148, 148);
+    color: black;
 }
 
 .close-icon:hover {
     cursor: pointer;
-    color: black;
+    color: white;
 }
 
 .users-list {
@@ -129,12 +153,14 @@
 }
 
 .users-list ul li {
+    background-color: rgb(255, 255, 255);
+    color: rgb(0, 0, 0);
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 10px;
     margin: 20px;
-    border-bottom: 1px solid gray;
+    border-radius: 10px;
 }
 
 .users-list ul li button {
@@ -154,7 +180,7 @@
 
 .friends-panel {
     margin: 0;
-    background-color: azure;
+    background-color: white;
     height: 100%;
     width: 20%;
     display: flex;
@@ -175,14 +201,14 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin: 5px;
+    margin: 10px;
     padding: 10px;
-    border-bottom: 1px solid rgb(213, 213, 213);
+    border-bottom: 1px solid rgb(255, 255, 255);
 }
 
 .friends-panel ul li:hover {
     cursor: pointer;
-    background-color: rgb(213, 213, 213);
+    background-color: rgb(0, 255, 225);
 }
 
 .delete-user-icon {
@@ -209,7 +235,7 @@
 }
 
 .user-online {
-    color: green;
+    color: rgb(0, 225, 0);
 }
 
 .user-offline {

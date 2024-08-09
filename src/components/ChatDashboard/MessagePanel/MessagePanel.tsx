@@ -1,12 +1,14 @@
 // Hooks
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSocket } from "../../../store/SocketContext";
-import { useAppSelector } from "../../../hooks/reduxActions";
-import { Modal } from "@mui/material";
+import { useAppDispatch, useAppSelector } from "../../../hooks/reduxActions";
+import { LinearProgress, Modal } from "@mui/material";
 import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
+import { LogoutUser } from "../../../store/slices/actions/authActions";
 
 // Utils
 import axios from '../../../utils/axios';
@@ -17,9 +19,13 @@ import "./MessagePanel.css";
 
 const MessagePanel = (props: any) => {
     const { selectedUser: friend, onlineUsers: onlineUsersList } = props;
-    const friendId = friend.friendId;
+    const { friendId } = friend;
 
-    const { socket } = useSocket();
+    const dispatch = useAppDispatch();
+
+    const { socket, registerUserAsOffline } = useSocket();
+
+    const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
     const userId = useAppSelector((state) => state.user._id);
     const accessToken = useAppSelector((state) => state.user.accessToken);
@@ -27,11 +33,14 @@ const MessagePanel = (props: any) => {
     const [messages, setMessages] = useState<any>([]);
     const [message, setMessage] = useState("");
     const [file, setFile] = useState(null);
+    const [fileName, setFileName] = useState("");
     const [isTyping, setIsTyping] = useState(false);
     const [friendTyping, setFriendTyping] = useState(false);
     const [selectedPreviewFile, setSelectedPreviewFile] = useState("");
     const [selectedPreviewFileType, setSelectedPreviewFileType] = useState("");
     const [previewModalOpen, setPreviewModalOpen] = useState(false);
+    const [sending, setSending] = useState(false);
+    const [fileSelectedError, setFileSelectedError] = useState(false);
 
     useEffect(() => {
         socket?.on('typing', ({ userId: typingUserId }) => {
@@ -58,7 +67,9 @@ const MessagePanel = (props: any) => {
 
         socket?.on('receiveMessage', (newMessage) => {
             console.log("New Message: ", newMessage);
-            setMessages((prevMessages: any) => [...prevMessages, newMessage])
+            if (newMessage.senderUserId === userId || newMessage.senderUserId === friendId) {
+                setMessages((prevMessages: any) => [...prevMessages, newMessage])
+            }
         });
 
         return () => {
@@ -68,6 +79,16 @@ const MessagePanel = (props: any) => {
             socket?.off('stopTyping');
         };
     }, [friend]);
+
+    const scrollToBottom = () => {
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    };
+    
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
 
     const handleTyping = () => {
         if (!isTyping) {
@@ -87,42 +108,94 @@ const MessagePanel = (props: any) => {
         if (file) {
             const formData = new FormData();
             formData.append("userFile", file);
+            console.log(file);
 
             try {
-                const res = await axios.post('/upload', formData, {
-                    headers: {
-                        "content-Type": "multipart/form-data",
-                        "Authorization": `Bearer ${ accessToken }`
-                    }
-                });
-
-                const { fileUrl, fileType } = res.data;
-
-                socket?.emit('sendMessage', {
-                    senderUserId: userId,
-                    receiverUserId: friend.friendId,
-                    content: message,
-                    fileType,
-                    fileUrl
-                });
-                setMessage('');
-                setFile(null);
-            } catch (err) {
+                if (file["type"] === "image/heic") {
+                    setFile(null);
+                    setFileName("");
+                } else {
+                    setSending(true);
+                    const res = await axios.post('/upload', formData, {
+                        headers: {
+                            "content-Type": "multipart/form-data",
+                            "Authorization": `Bearer ${ accessToken }`
+                        }
+                    });
+    
+                    console.log(res);
+    
+                    const { fileUrl, fileType } = res.data;
+    
+                    socket?.emit('sendMessage', {
+                        senderUserId: userId,
+                        receiverUserId: friend.friendId,
+                        content: message,
+                        fileType,
+                        fileUrl
+                    });
+                    setSending(false);
+                    setMessage("");
+                    setFile(null);
+                    setFileName("");
+                }
+            } catch (err: any) {
                 console.log('Error uploading file: ', err);
+                if (err.response.status === 403 || err.response.status === 401) {
+                    if (userId !== undefined) {
+                        registerUserAsOffline(userId);
+                    }
+                    dispatch(LogoutUser(accessToken));
+                }
             }
         } else {
-            socket?.emit('sendMessage', {
-                senderUserId: userId,
-                receiverUserId: friend.friendId,
-                content: message,
-            });
+            if (message.length !== 0) {
+                try {
+                    const res = await axios.get("/auth/verifyToken", {
+                        headers: {
+                            "Authorization": `Bearer ${ accessToken }`
+                        }
+                    });
+                    console.log(res);
+                    setSending(true);
+                    socket?.emit('sendMessage', {
+                        senderUserId: userId,
+                        receiverUserId: friend.friendId,
+                        content: message,
+                    });
+                    setSending(false);
+                } catch (err: any) {
+                    console.log("Error sending message: ", err);
+                    if (err.response.status === 403 || err.response.status === 401) {
+                        if (userId !== undefined) {
+                            registerUserAsOffline(userId);
+                        }
+                        dispatch(LogoutUser(accessToken));
+                    }
+                } 
+            }
             setMessage('');
             handleStopTyping();
         }
     };
 
     const handleFileChange = (event: any) => {
-        setFile(event.target.files[0]);
+        console.log(event.target.files);
+        if (event.target.files.length === 0) {
+            setFileSelectedError(false);
+            setFileName("");
+            setFile(null);
+        } else {
+            if (event.target.files[0].type === "image/heic") {
+                setFileSelectedError(true);
+                setFileName("");
+                setFile(null);
+            } else {
+                setFileSelectedError(false);
+                setFileName(event.target.files[0].name);
+                setFile(event.target.files[0]);
+            }
+        }
     };
 
     const formatTimestamp = (timestamp: string) => {
@@ -140,20 +213,24 @@ const MessagePanel = (props: any) => {
         if (timeDifference < millisecondsInADay && currentDate.getDate() === messageDate.getDate()) {
             return `${hours}:${minutes} Today`;
         } else if (timeDifference < millisecondsInAWeek) {
-            const daysAgo = Math.floor(timeDifference / millisecondsInADay);
+            const daysAgo = Math.floor(timeDifference / millisecondsInADay) + 1;
+            if (daysAgo === 1) {
+                return `1 day ago`;
+            }
             return `${daysAgo} days ago`;
         } else if (timeDifference < 3 * millisecondsInAWeek) {
-            const weeksAgo = Math.floor(timeDifference / millisecondsInAWeek);
+            const weeksAgo = Math.floor(timeDifference / millisecondsInAWeek) + 1;
             return `${weeksAgo} weeks ago`;
         } else {
-            const monthsAgo = Math.floor(timeDifference / millisecondsInAMonth);
+            const monthsAgo = Math.floor(timeDifference / millisecondsInAMonth) + 1;
             return `${monthsAgo} months ago`;
         }
     };
 
     const extractLinks = (text: string) => {
-        const urlRegex = /https?:\/\/[^\s]+/g;
-        return text.match(urlRegex) || [];
+        const urlRegex = /https?:\/\/[^\s,;'"()<>[\]{}]+/g;
+        const matches = text.match(urlRegex) || [];
+        return Array.from(new Set(matches));
     };
 
     const handleFileSelected = (url: string, fileType: string) => {
@@ -175,11 +252,11 @@ const MessagePanel = (props: any) => {
             {(friend.friendId !== "" && friend.firstName !== "") ?    
                 <>
                     <div className="message-panel-header">
-                        <div>
+                        <div className="friend-name">
                             { friend.friendFirstName }
                         </div>
-                        <div>
-                            { isUserOnline ? <FiberManualRecordIcon fontSize="small" className="user-online" /> : <FiberManualRecordIcon fontSize="small" className="user-offline" /> }
+                        <div className="friend-status">
+                            { isUserOnline ? <FiberManualRecordIcon className="user-online" /> : <FiberManualRecordIcon fontSize="small" className="user-offline" /> }
                         </div>
                     </div>
                     <div className="message-panel-conversation">
@@ -192,16 +269,9 @@ const MessagePanel = (props: any) => {
                                 <div className="message-document">
                                     {selectedPreviewFileType === 'image' && <img src={selectedPreviewFile} alt="file" style={{ maxWidth: '600px' }} />}
                                     {selectedPreviewFileType === 'video' && (
-                                        <video src={selectedPreviewFile} controls style={{ maxWidth: '600px' }}>
+                                        <video src={selectedPreviewFile} controls style={{ maxWidth: '600px', maxHeight: '500px' }}>
                                             Your browser does not support the video tag.
                                         </video>
-                                    )}
-                                    {selectedPreviewFileType === 'document' && (
-                                        <iframe
-                                        src={selectedPreviewFile}
-                                        title="document preview"
-                                        style={{ width: '100%', height: '500px' }}
-                                        ></iframe>
                                     )}
                                 </div>
                                 <div onClick={() => setPreviewModalOpen(false)}>
@@ -209,26 +279,28 @@ const MessagePanel = (props: any) => {
                                 </div>
                             </div>
                         </Modal>
-                        { messages.length === 0 && <div>Start conversation</div> }
+                        { messages.length === 0 && <div className="start-conversation">Start conversation</div> }
                         {messages.map((msg: any) => {
                             const links = extractLinks(msg.content);
                             const isFile = msg.fileType && ['application', 'document', 'text'].includes(msg.fileType);
 
                             return <div className={msg.senderUserId === userId ? "message-right" : "message-left"}>
-                                <div className="message">
-                                    <div className="message-header">
-                                        {msg.senderUserId === userId ? "You" : `${friend.friendFirstName}`}
-                                    </div>
-                                    {links.length !== 0 && links.map((link) => (
+                                <div className={msg.senderUserId === userId ? `message-div-right` : `message-div-left`}>
+                                    {/* <div className="message-header">
                                         <div>
+                                            {msg.senderUserId === userId ? "you" : `${friend.friendFirstName}`}
+                                        </div>
+                                    </div> */}
+                                    {links.length !== 0 && links.map((link) => (
+                                        <div className="link">
                                             <a href={link} target="_blank">{link}</a>
                                         </div>
                                     ))}
                                     {msg.fileUrl && (
                                         <div className="message-document" onClick={() => handleFileSelected(msg.fileUrl, msg.fileType)}>
-                                            {msg.fileType === 'image' && <img src={msg.fileUrl} alt="file" style={{ maxWidth: '200px' }} />}
+                                            {msg.fileType === 'image' && <img src={msg.fileUrl} alt="file" className="image-message" />}
                                             {msg.fileType === 'video' && (
-                                                <video src={msg.fileUrl} controls style={{ maxWidth: '200px' }}>
+                                                <video src={msg.fileUrl} className="video-message">
                                                     Your browser does not support the video tag.
                                                 </video>
                                             )}
@@ -240,42 +312,52 @@ const MessagePanel = (props: any) => {
                                                     Click to download
                                                 </div>
                                             </div>}
-                                            {/* {msg.fileType === 'document' && (
-                                                <iframe
-                                                src={msg.fileUrl}
-                                                title="document preview"
-                                                style={{ width: '100%', height: '500px' }}
-                                                ></iframe>
-                                            )} */}
                                         </div>
                                     )}
                                     <div className="message-content">
                                         <div>
                                             {msg.content}
                                         </div>
-                                        <div style={{ color: '#656565' }}>
+                                        <div style={{ color: 'rgb(113, 113, 113)', fontSize: '10px', marginTop: '10px' }}>
                                             {formatTimestamp(msg.timestamp)}
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         })}
-                        {friendTyping && <div className="is-typing">
-                            Typing...
-                        </div>}
+                    <div ref={messagesEndRef} />
                     </div>
+                    {friendTyping && <div className="is-typing">
+                        Typing...
+                    </div>}
+                    {sending && <div>
+                        <LinearProgress />
+                    </div>}
                     <div className="message-panel-form">
-                        <input type="text" placeholder="Message..." value={ message } onChange={ (e) => setMessage(e.target.value) } onKeyDown={handleTyping} onKeyUp={handleStopTyping} onBlur={handleStopTyping}/>
+                        <div className="message-box">
+                            <input type="text" placeholder="Message..." value={ message } onChange={ (e) => setMessage(e.target.value) } onKeyDown={handleTyping} onKeyUp={handleStopTyping} onBlur={handleStopTyping}/>
+                        </div>
                         <div className="action-buttons">
-                            <input type="file" onChange={handleFileChange} name="file" />
+                            <div className="upload-button-div">
+                                <label htmlFor="upload-button">
+                                    <FileUploadIcon fontSize="medium" />
+                                </label>
+                                <input id="upload-button" type="file" onChange={handleFileChange} name="file" />
+                            </div>
                             <div className="send-message-icon-div" onClick={ sendMessage }>
-                                <SendIcon className="send-message-icon" />
+                                <SendIcon className="send-message-icon" fontSize="inherit" />
                             </div>
                         </div>
                     </div>
+                    {fileName.length !== 0 && <div className="file-selected">
+                        File Selected: {fileName}
+                    </div>}
+                    {fileSelectedError && <div className="file-selected-error">
+                        HEIC files are not supported
+                    </div>}
                 </>
             : 
-                <div>
+                <div className="no-conversation">
                     No Conversation Selected
                 </div>
             }
